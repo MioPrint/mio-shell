@@ -13,7 +13,7 @@ git submodule update --remote submodules/mio-shell
 # + commit 
 
 # Pin to a specific commit (e.g. for a hotfix)
-cd lib/shared
+cd submodules/mio-shell
 git checkout <sha>
 # + commit
 
