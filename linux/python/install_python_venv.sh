@@ -10,20 +10,19 @@
 # $0                | Path of the script itself | Path of the calling script |
 # ${BASH_SOURCE[0]} | Path of the script itself | Path of the sourced file   |
 #
+# echo 
+# echo "$0"
+# echo "${BASH_SOURCE[0]}"
+# echo 
+# echo "$(cd -- "$(dirname -- "$0")" &>/dev/null && pwd)/"
+# echo "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/"
 
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
 
-  # echo "$0"
-  # echo "${BASH_SOURCE[0]}"
-
-  echo 
-  echo "$(cd -- "$(dirname -- "$0")" &>/dev/null && pwd)/"
-  echo "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/"
-
-  # SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/"   
-  # VENV_DIR="$SCRIPT_DIR.venv/"
-  # INSTALL_LOGS_DIR="$SCRIPT_DIR.install_logs/"
-  # ACTIVATE_SCRIPT="$VENV_DIR/bin/activate"
+  CALLING_SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" &>/dev/null && pwd)/"   
+  VENV_DIR="$CALLING_SCRIPT_DIR.venv/"
+  INSTALL_LOGS_DIR="$CALLING_SCRIPT_DIR.install_logs/"
+  ACTIVATE_SCRIPT="$VENV_DIR/bin/activate"
 
   run_required() {
     local enum="$1"; shift
