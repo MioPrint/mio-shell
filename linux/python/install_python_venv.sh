@@ -13,8 +13,12 @@
 
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
 
-  echo "$0"
-  echo "${BASH_SOURCE[0]}"
+  # echo "$0"
+  # echo "${BASH_SOURCE[0]}"
+
+  echo 
+  echo "$(cd -- "$(dirname -- "$0")" &>/dev/null && pwd)/"
+  echo "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/"
 
   # SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/"   
   # VENV_DIR="$SCRIPT_DIR.venv/"
