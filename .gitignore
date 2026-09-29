@@ -1,0 +1,6 @@
+# General
+*.log
+*.vscode
+*.code-workspace
+*.tmp
+.tmp/
