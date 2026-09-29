@@ -24,6 +24,15 @@ if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   INSTALL_LOGS_DIR="$CALLING_SCRIPT_DIR.install_logs/"
   ACTIVATE_SCRIPT="$VENV_DIR/bin/activate"
 
+  if command -v python >/dev/null 2>&1; then
+    true
+  else
+    echo >&2
+    echo "python executable NOT Found! Cannot continue setup.sh"
+    echo >&2
+    exit 1
+  fi
+
   run_required() {
     local enum="$1"; shift
     local label="$1"; shift
@@ -93,14 +102,14 @@ if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   }
 
   prepare_native_python() {
-    run_optional 1 "Upgrading native pip" $PYTHON_CMD -m pip install --upgrade pip
-    run_required 2 "Installing native virtualenv" $PYTHON_CMD -m pip install virtualenv
+    run_optional 1 "Upgrading native pip" python -m pip install --upgrade pip
+    run_required 2 "Installing native virtualenv" python -m pip install virtualenv
   }
 
   make_venv() {
     local target_python="$1"
     if command -v $target_python >/dev/null 2>&1; then
-      run_required 3 "Making virtual environment" $PYTHON_CMD -m virtualenv $VENV_DIR --clear --copies --python=$target_python
+      run_required 3 "Making virtual environment" python -m virtualenv $VENV_DIR --clear --copies --python=$target_python
     else
       echo >&2
       echo "  Target python : $target_python : NOT FOUND"
