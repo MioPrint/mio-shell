@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# install-python.sh — build and install CPython from python.org source into /usr/local
+# install_python.sh — build and install CPython from python.org source into /usr/local
 #
 # Usage:
-#   ./install-python.sh python3.X.Y   # install exactly that version
-#   ./install-python.sh python3.X     # install the latest released 3.X.Y
+#   ./install_python.sh python3.X.Y   # install exactly that version
+#   ./install_python.sh python3.X     # install the latest released 3.X.Y
 #
 # Any existing /usr/local/bin/python3.X is overwritten in place ("make altinstall"),
 # so pip-installed packages and virtual environments for 3.X keep working.
@@ -62,7 +62,7 @@ tarball_url() { echo "$FTP/$1/Python-$1.tar.xz"; }
 
 latest_version() {
   local listing v
-  listing=$(curl -fsSL "$FTP/") || die "Could not fetch the release list from $FTP/"
+  listing=$(curl -fsSL "$FTP/") || { warn "Could not fetch the release list from $FTP/"; return 1; }
   # Directories like 3.12.15/ — newest first. Some directories only hold
   # pre-releases (e.g. 3.15.0/ before final), so check the final tarball exists.
   while read -r v; do
@@ -115,6 +115,29 @@ else
 fi
 info "Configure options: ${configure_args[*]}"
 
+# ---------------------------------------------------------------- cleanup & sudo
+workdir=""
+sudo_keepalive=""
+cleanup() {
+  local status=$?
+  [[ -n $sudo_keepalive ]] && kill "$sudo_keepalive" 2>/dev/null
+  [[ -n $workdir ]] || return 0
+  if [[ $status -eq 0 ]]; then
+    rm -rf "$workdir"
+  else
+    warn "Build failed — build files kept in $workdir for inspection (remove with: sudo rm -rf $workdir)."
+  fi
+}
+trap cleanup EXIT
+
+# Ask for the password once, then keep the sudo timestamp fresh so the
+# final "make altinstall" doesn't stall on a prompt after the long build.
+if [[ -n $SUDO ]]; then
+  sudo -v || die "sudo authentication failed"
+  while kill -0 "$$" 2>/dev/null; do sudo -n -v 2>/dev/null || true; sleep 60; done &
+  sudo_keepalive=$!
+fi
+
 # ---------------------------------------------------------------- build dependencies
 info "Installing build dependencies..."
 if command -v apt-get >/dev/null; then
@@ -136,15 +159,6 @@ done
 
 # ---------------------------------------------------------------- download & build
 workdir=$(mktemp -d -t python-build-XXXXXX)
-cleanup() {
-  local status=$?
-  if [[ $status -eq 0 ]]; then
-    rm -rf "$workdir"
-  else
-    warn "Build failed — build files kept in $workdir for inspection."
-  fi
-}
-trap cleanup EXIT
 
 info "Downloading $url"
 curl -fL --progress-bar -o "$workdir/Python-$version.tar.xz" "$url"
@@ -159,6 +173,9 @@ make -j"$(nproc)"
 
 info "Installing (make altinstall)..."
 $SUDO make altinstall
+# altinstall runs as root and drops root-owned __pycache__ dirs into the
+# build tree; hand it back so cleanup can remove it without sudo.
+[[ -n $SUDO ]] && $SUDO chown -R "$(id -u):$(id -g)" "$workdir"
 
 # Needed with --enable-shared so the new libpython is picked up.
 $SUDO ldconfig
