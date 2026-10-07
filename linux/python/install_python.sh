@@ -1,28 +1,68 @@
 #!/usr/bin/env bash
-#
-# install_python.sh — build and install CPython from python.org source into /usr/local
-#
-# Usage:
-#   ./install_python.sh python3.X.Y   # install exactly that version
-#   ./install_python.sh python3.X     # install the latest released 3.X.Y
-#
-# Any existing /usr/local/bin/python3.X is overwritten in place ("make altinstall"),
-# so pip-installed packages and virtual environments for 3.X keep working.
-# Other versions (and the generic "python3" link) are left untouched.
-#
-# Environment overrides:
-#   FORCE=1   rebuild even if the requested version is already installed
-#
+
+# Build and install CPython from python.org source into /usr/local.
+    #
+    # Description
+    #     Usage:
+    #       ./install_python.sh python3.X.Y   # install exactly that version
+    #       ./install_python.sh python3.X     # install the latest released 3.X.Y
+    #
+    #     Any existing /usr/local/bin/python3.X is overwritten in place ("make altinstall"),
+    #     so pip-installed packages and virtual environments for 3.X keep working.
+    #     Other versions (and the generic "python3" link) are left untouched.
+    #
+    #     Environment overrides:
+    #       FORCE=1   rebuild even if the requested version is already installed
+    #
+    # Notes
+    #     --enable-shared is dropped when the distro already ships
+    #     libpython3.X.so.1.0 (e.g. Ubuntu 24.04's 3.12): /usr/local/lib comes
+    #     first in the ld.so search order, so ours would shadow it and break
+    #     apps embedding the system Python (QGIS: "No module named 'math'").
+    #
+
 set -euo pipefail
 
 PREFIX="/usr/local"
 DEFAULT_CONFIGURE_ARGS=(--prefix="$PREFIX" --enable-optimizations --enable-shared)
 FTP="https://www.python.org/ftp/python"
 
+# Print a progress message.
+    #
+    # Inputs
+    #     $*  message text.
+    #
+    # Outputs
+    #     Message on stdout.
+    #
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+# Print a warning.
+    #
+    # Inputs
+    #     $*  message text.
+    #
+    # Outputs
+    #     Message on stderr.
+    #
 warn() { printf '\033[1;33mWarning:\033[0m %s\n' "$*" >&2; }
+# Print an error and exit with status 1.
+    #
+    # Inputs
+    #     $*  message text.
+    #
+    # Outputs
+    #     Message on stderr.
+    #
 die()  { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
 
+# Print usage and exit with status 1.
+    #
+    # Inputs
+    #     None.
+    #
+    # Outputs
+    #     Usage text on stderr.
+    #
 usage() {
   cat >&2 <<EOF
 Usage: $(basename "$0") python3.X.Y | python3.X
@@ -58,8 +98,24 @@ fi
 command -v curl >/dev/null || die "curl is required (e.g. sudo apt install curl)"
 
 # ---------------------------------------------------------------- resolve version
+# Build the python.org source tarball URL for a version.
+    #
+    # Inputs
+    #     $1  full version, e.g. 3.12.15.
+    #
+    # Outputs
+    #     URL on stdout.
+    #
 tarball_url() { echo "$FTP/$1/Python-$1.tar.xz"; }
 
+# Find the newest final release of $minor on python.org.
+    #
+    # Inputs
+    #     minor  global, e.g. 3.12.
+    #
+    # Outputs
+    #     Version on stdout; status 1 if none found.
+    #
 latest_version() {
   local listing v
   listing=$(curl -fsSL "$FTP/") || { warn "Could not fetch the release list from $FTP/"; return 1; }
@@ -108,6 +164,21 @@ if [[ -n $current ]]; then
   fi
 fi
 
+# Never shadow a distro-provided libpython of the same version (see Notes).
+shared=0
+system_lib=$(ldconfig -p | grep -F "libpython$minor.so.1.0 " | grep -vF "=> $PREFIX/" || true)
+if [[ -n $system_lib ]]; then
+  info "System libpython$minor.so.1.0 found — building without --enable-shared so it isn't shadowed."
+  filtered=()
+  for a in "${configure_args[@]}"; do
+    [[ $a == --enable-shared ]] || filtered+=("$a")
+  done
+  configure_args=("${filtered[@]}")
+fi
+for a in "${configure_args[@]}"; do
+  if [[ $a == --enable-shared ]]; then shared=1; fi
+done
+
 if [[ -n $current ]]; then
   info "Replacing Python $current with Python $version at $bin"
 else
@@ -118,6 +189,15 @@ info "Configure options: ${configure_args[*]}"
 # ---------------------------------------------------------------- cleanup & sudo
 workdir=""
 sudo_keepalive=""
+# Stop the sudo keep-alive and remove the build dir on success (EXIT trap).
+    #
+    # Inputs
+    #     workdir         global, build dir (may be empty).
+    #     sudo_keepalive  global, keep-alive PID (may be empty).
+    #
+    # Outputs
+    #     Warning on stderr if the build dir is kept.
+    #
 cleanup() {
   local status=$?
   [[ -n $sudo_keepalive ]] && kill "$sudo_keepalive" 2>/dev/null
@@ -177,7 +257,18 @@ $SUDO make altinstall
 # build tree; hand it back so cleanup can remove it without sudo.
 [[ -n $SUDO ]] && $SUDO chown -R "$(id -u):$(id -g)" "$workdir"
 
-# Needed with --enable-shared so the new libpython is picked up.
+# A previous --enable-shared build of this version leaves its libpython
+# behind; remove it so it no longer shadows the system one.
+if [[ $shared -eq 0 ]]; then
+  for f in "$PREFIX/lib/libpython$minor.so" "$PREFIX/lib/libpython$minor.so.1.0"; do
+    if [[ -e $f || -L $f ]]; then
+      info "Removing stale $f"
+      $SUDO rm -f "$f"
+    fi
+  done
+fi
+
+# Refresh the linker cache (picks up the new libpython with --enable-shared).
 $SUDO ldconfig
 
 # ---------------------------------------------------------------- verify
