@@ -103,7 +103,7 @@ if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
 
   prepare_native_python() {
     run_optional 1 "Upgrading native pip" python -m pip install --upgrade pip
-    run_required 2 "Installing native virtualenv" python -m pip install virtualenv
+    run_required 2 "Installing native virtualenv" python -m pip install --upgrade virtualenv
   }
 
   make_venv() {
