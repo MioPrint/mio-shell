@@ -14,6 +14,9 @@
     #     Environment overrides:
     #       FORCE=1   rebuild even if the requested version is already installed
     #
+    #     For changing default "python":
+    #     sudo update-alternatives --config python
+    #
     # Notes
     #     --enable-shared is dropped when the distro already ships
     #     libpython3.X.so.1.0 (e.g. Ubuntu 24.04's 3.12): /usr/local/lib comes

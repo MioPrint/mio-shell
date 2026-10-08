@@ -109,7 +109,10 @@ if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   make_venv() {
     local target_python="$1"
     if command -v $target_python >/dev/null 2>&1; then
-      run_required 3 "Making virtual environment" python -m virtualenv $VENV_DIR --clear --copies --python=$target_python
+      # Resolve symlinks (e.g. update-alternatives' /usr/bin/python): otherwise pyvenv.cfg
+      # gets home=/usr/bin and a /usr/local build picks up the distro stdlib in /usr/lib.
+      local target_python_path="$(readlink -f "$(command -v "$target_python")")"
+      run_required 3 "Making virtual environment" python -m virtualenv $VENV_DIR --clear --copies --python="$target_python_path"
     else
       echo >&2
       echo "  Target python : $target_python : NOT FOUND"
